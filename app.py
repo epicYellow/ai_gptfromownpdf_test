@@ -11,13 +11,22 @@ from langchain.llms import HuggingFaceHub
 
 from htmlTemplates import css, bot_template, user_template
 
+import fitz  # PyMuPDF
+
+import fitz  # PyMuPDF
+
 def get_pdf_text(pdf_docs):
     text = ""
+
     for pdf in pdf_docs:
-        pdf_reader = PdfReader(pdf)
-        for page in pdf_reader.pages:
-            text += page.extract_text()
+        # Use the file-like object directly with PyMuPDF
+        with fitz.open(stream=pdf.read(), filetype="pdf") as doc:
+            for page in doc:
+                text += page.get_text()
+
     return text
+
+
 
 def get_text_chunks(text):
     text_splitter = CharacterTextSplitter(
@@ -31,7 +40,7 @@ def get_vectorstore_Hug(chunks):
 
 def get_convo_chainHug(vectorstore):
     # Define the HuggingFace model without overriding the task
-    llm = HuggingFaceHub(repo_id="google/flan-t5-large", model_kwargs={"temperature": 0.8, "max_length": 512})
+    llm = HuggingFaceHub(repo_id="google/flan-t5-large", model_kwargs={"temperature": 0.6, "max_length": 512})
 
     # Define memory and conversation chain
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
