@@ -49,8 +49,8 @@ def handle_userInput(user_question):
     response = st.session_state.conversation({'question': user_question})
     st.session_state.chat_history = response['chat_history']
 
-    for i, message in enumerate(st.session_state.chat_history):
-        template = user_template if i % 2 == 0 else bot_template
+    for i, message in enumerate(reversed(st.session_state.chat_history)):
+        template = user_template if i % 2 != 0 else bot_template
         st.write(template.replace("{{MSG}}", message.content), unsafe_allow_html=True)
 
 def main():
