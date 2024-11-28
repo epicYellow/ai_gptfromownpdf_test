@@ -13,113 +13,74 @@ from htmlTemplates import css, bot_template, user_template
 
 def get_pdf_text(pdf_docs):
     text = ""
-
     for pdf in pdf_docs:
-        #creates pdf object with pages
         pdf_reader = PdfReader(pdf)
         for page in pdf_reader.pages:
             text += page.extract_text()
-
     return text
 
 def get_text_chunks(text):
-
     text_splitter = CharacterTextSplitter(
-        separator="\n",
-        chunk_size=1000,
-        chunk_overlap=200,
-        length_function=len
+        separator="\n", chunk_size=1000, chunk_overlap=200, length_function=len
     )
-
-    chunks=text_splitter.split_text(text)
-
-    return chunks
-
-def get_vectorstore_openAI(chunks):
-    embeddings = OpenAIEmbeddings()
-
-    vectorstore = FAISS.from_texts(texts=chunks, embedding=embeddings)
-
-    return vectorstore
+    return text_splitter.split_text(text)
 
 def get_vectorstore_Hug(chunks):
     embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-base")
-
-    vectorstore = FAISS.from_texts(texts=chunks, embedding=embeddings)
-
-    return vectorstore
-
-def get_convo_chainOpenAI(vectorstore):
-    llm = ChatOpenAI()
-    memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-    conversation_chain = ConversationalRetrievalChain.from_llm(
-        memory=memory,
-        llm=llm,
-        retriever=vectorstore.as_retriever()
-        )
-    return conversation_chain
+    return FAISS.from_texts(texts=chunks, embedding=embeddings)
 
 def get_convo_chainHug(vectorstore):
-    llm = HuggingFaceHub(repo_id="google/flan-t5-xxl", model_kwargs={"temperature":0.5, "max_length":512})
+    # Define the HuggingFace model without overriding the task
+    llm = HuggingFaceHub(repo_id="google/flan-t5-large", model_kwargs={"temperature": 0.8, "max_length": 512})
+
+    # Define memory and conversation chain
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
     conversation_chain = ConversationalRetrievalChain.from_llm(
-        memory=memory,
-        llm=llm,
-        retriever=vectorstore.as_retriever()
-        )
+        memory=memory, llm=llm, retriever=vectorstore.as_retriever()
+    )
     return conversation_chain
 
+
 def handle_userInput(user_question):
+    if st.session_state.conversation is None:
+        st.error("No conversation chain found. Please upload and process PDFs first.")
+        return
+
     response = st.session_state.conversation({'question': user_question})
     st.session_state.chat_history = response['chat_history']
 
     for i, message in enumerate(st.session_state.chat_history):
-        if i % 2 == 0:
-            st.write(user_template.replace("{{MSG}}", message.content), unsafe_allow_html=True)
-        else:
-            st.write(bot_template.replace("{{MSG}}", message.content), unsafe_allow_html=True)
-        
+        template = user_template if i % 2 == 0 else bot_template
+        st.write(template.replace("{{MSG}}", message.content), unsafe_allow_html=True)
+
 def main():
     load_dotenv()
 
-    #initialize session storage variable
     if "conversation" not in st.session_state:
         st.session_state.conversation = None
-
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = None
 
-    st.set_page_config(page_title="chat")
+    st.set_page_config(page_title="Chat with PDFs")
     st.write(css, unsafe_allow_html=True)
-    
-    st.header("Chat With Pdfs")
-    user_question = st.text_input("Ask question")
+
+    st.header("Chat with PDFs")
+    user_question = st.text_input("Ask a question:")
 
     if user_question:
         handle_userInput(user_question)
 
     with st.sidebar:
-        st.subheader("documents")
-        pdf_docs = st.file_uploader("Upload pdf", accept_multiple_files=True)
+        st.subheader("Your Documents")
+        pdf_docs = st.file_uploader("Upload PDFs", accept_multiple_files=True)
         if st.button("Process"):
             with st.spinner("Processing"):
-                # get pdf text raw
                 raw_text = get_pdf_text(pdf_docs)
-
-                # Get text chunks
                 chunks = get_text_chunks(raw_text)
+                vectorstore = get_vectorstore_Hug(chunks)
+                st.write("Vector store created!")
+                st.session_state.conversation = get_convo_chainHug(vectorstore)
+                st.success("Conversation chain initialized!")
 
-                # create vector store (embeddings)
-                # Embeddings refer to a technique used to represent words, phrases, or entire documents as numerical vectors in a high-dimensional space
-                # Word embeddings are a type of text embedding commonly used in NLP. They map words from a vocabulary to continuous vector spaces, where words with similar meanings are closer to each other in the vector space
-                vectorstore = get_vectorstore_openAI(chunks)
-                st.write(vectorstore)
-
-                # conversation chain
-                #saves in session
-                st.session_state.conversation = get_vectorstore_Hug(vectorstore)
-
-    # st.session_state.conversation
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
