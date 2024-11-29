@@ -13,8 +13,6 @@ from htmlTemplates import css, bot_template, user_template
 
 import fitz  # PyMuPDF
 
-import fitz  # PyMuPDF
-
 def get_pdf_text(pdf_docs):
     text = ""
 
@@ -25,8 +23,6 @@ def get_pdf_text(pdf_docs):
                 text += page.get_text()
 
     return text
-
-
 
 def get_text_chunks(text):
     text_splitter = CharacterTextSplitter(
@@ -40,7 +36,7 @@ def get_vectorstore_Hug(chunks):
 
 def get_convo_chainHug(vectorstore):
     # Define the HuggingFace model without overriding the task
-    llm = HuggingFaceHub(repo_id="google/flan-t5-large", model_kwargs={"temperature": 0.6, "max_length": 512})
+    llm = HuggingFaceHub(repo_id="meta-llama/Llama-3.2-1B", model_kwargs={"temperature": 0.7, "max_length": 512})
 
     # Define memory and conversation chain
     memory = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
